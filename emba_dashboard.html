@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EMBA Firmware Security Analyzer Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-tertiary: #1a2332;
+      --accent-red: #ef4444;
+      --accent-orange: #f97316;
+      --accent-yellow: #eab308;
+      --accent-green: #22c55e;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-purple: #a855f7;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --border: #1e293b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 28px; background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo {
+      display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800;
+      letter-spacing: -0.5px; color: var(--text-primary);
+    }
+    .logo-icon {
+      width: 36px; height: 36px; background: linear-gradient(135deg, #ef4444, #f97316);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-size: 18px; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    }
+    .badge {
+      padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .badge-kritis { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-cra { background: rgba(168, 85, 247, 0.15); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .header-right { display: flex; align-items: center; gap: 20px; }
+    .scan-status {
+      display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary);
+    }
+    .pulse {
+      width: 8px; height: 8px; background: var(--accent-green); border-radius: 50%;
+      animation: pulse 2s infinite; box-shadow: 0 0 8px var(--accent-green);
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .fw-info { font-size: 13px; color: var(--text-secondary); }
+    .fw-info span { color: var(--text-primary); font-weight: 600; }
+
+    .main { display: flex; }
+    .sidebar {
+      width: 220px; background: var(--bg-secondary); border-right: 1px solid var(--border);
+      padding: 20px 0; min-height: calc(100vh - 70px); flex-shrink: 0;
+      position: sticky; top: 70px; height: calc(100vh - 70px); overflow-y: auto;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 24px; cursor: pointer; font-size: 14px;
+      color: var(--text-secondary); transition: all 0.2s;
+      border-left: 3px solid transparent; text-decoration: none;
+    }
+    .nav-item:hover { background: rgba(59, 130, 246, 0.08); color: var(--text-primary); }
+    .nav-item.active { background: rgba(59, 130, 246, 0.12); color: var(--accent-blue); border-left-color: var(--accent-blue); }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .nav-section { padding: 0 24px; margin: 16px 0 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #475569; font-weight: 700; }
+
+    .content { flex: 1; padding: 24px; overflow-y: auto; }
+    .page-section { display: none; animation: fadeIn 0.35s ease-out; }
+    .page-section.active { display: block; }
+
+    .kpi-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px;
+      padding: 20px; position: relative; overflow: hidden; transition: transform 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); }
+    .kpi-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    }
+    .kpi-card.critical::before { background: linear-gradient(90deg, var(--accent-red), var(--accent-orange)); }
+    .kpi-card.high::before { background: linear-gradient(90deg, var(--accent-orange), var(--accent-yellow)); }
+    .kpi-card.medium::before { background: linear-gradient(90deg, var(--accent-yellow), var(--accent-green)); }
+    .kpi-card.info::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan)); }
+    .kpi-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .kpi-value { font-size: 32px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+    .kpi-sub { font-size: 12px; color: var(--text-secondary); }
+    .kpi-sub .trend { font-weight: 600; }
+    .trend-up { color: var(--accent-red); }
+    .trend-down { color: var(--accent-green); }
+
+    .section-card {
+      background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px;
+      margin-bottom: 20px; overflow: hidden;
+    }
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 12px;
+    }
+    .section-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .section-body { padding: 20px; }
+
+    .sbom-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .sbom-table th { text-align: left; padding: 10px 12px; color: var(--text-secondary); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+    .sbom-table td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+    .sbom-table tr:hover td { background: rgba(59, 130, 246, 0.05); }
+    .component-type { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .type-binary { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+    .type-library { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+    .type-script { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+    .type-kernel { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .cve-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+    .cve-critical { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .cve-high { background: rgba(249, 115, 22, 0.2); color: #f97316; }
+    .cve-medium { background: rgba(234, 179, 8, 0.2); color: #eab308; }
+    .cve-low { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
+
+    .timeline-container { position: relative; padding-left: 30px; }
+    .timeline-line { position: absolute; left: 8px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .timeline-item { position: relative; margin-bottom: 20px; }
+    .timeline-dot {
+      position: absolute; left: -26px; top: 4px; width: 12px; height: 12px; border-radius: 50%;
+      border: 2px solid var(--bg-primary); box-shadow: 0 0 0 2px var(--border);
+    }
+    .timeline-dot.critical { background: var(--accent-red); box-shadow: 0 0 0 2px var(--accent-red), 0 0 10px rgba(239,68,68,0.4); }
+    .timeline-dot.high { background: var(--accent-orange); box-shadow: 0 0 0 2px var(--accent-orange); }
+    .timeline-dot.medium { background: var(--accent-yellow); box-shadow: 0 0 0 2px var(--accent-yellow); }
+    .timeline-content { background: var(--bg-tertiary); border-radius: 8px; padding: 14px 16px; border: 1px solid var(--border); }
+    .timeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
+    .cve-id { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--accent-blue); }
+    .cve-score { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+    .score-critical { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+    .score-high { background: rgba(249,115,22,0.2); color: var(--accent-orange); }
+    .cve-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+    .cve-meta { display: flex; gap: 16px; margin-top: 8px; font-size: 11px; color: #64748b; flex-wrap: wrap; }
+
+    .cred-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .cred-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px;
+      transition: all 0.2s; cursor: pointer;
+    }
+    .cred-card:hover { border-color: var(--accent-red); background: rgba(239,68,68,0.05); }
+    .cred-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .cred-icon.password { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+    .cred-icon.key { background: rgba(234,179,8,0.15); color: var(--accent-yellow); }
+    .cred-icon.cert { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+    .cred-icon.token { background: rgba(168,85,247,0.15); color: var(--accent-purple); }
+    .cred-details { flex: 1; min-width: 0; }
+    .cred-file { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent-cyan); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cred-type { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+    .cred-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-secondary); background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; word-break: break-all; }
+    .cred-severity { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; margin-left: auto; flex-shrink: 0; }
+    .sev-critical { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+    .sev-high { background: rgba(249,115,22,0.2); color: var(--accent-orange); }
+
+    .risk-meter { display: flex; align-items: center; gap: 20px; padding: 20px; flex-wrap: wrap; }
+    .risk-gauge { position: relative; width: 160px; height: 80px; flex-shrink: 0; }
+    .risk-gauge svg { width: 100%; height: 100%; }
+    .risk-value { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); text-align: center; }
+    .risk-value .num { font-size: 28px; font-weight: 800; }
+    .risk-value .label { font-size: 11px; color: var(--text-secondary); }
+    .risk-details { flex: 1; min-width: 200px; }
+    .risk-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0 16px; }
+    .risk-bar-segment { height: 100%; }
+    .risk-factors { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .risk-factor { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .risk-factor-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    .module-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .module-cell {
+      aspect-ratio: 1; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: var(--text-primary); cursor: pointer;
+      transition: all 0.2s; position: relative;
+    }
+    .module-cell:hover { transform: scale(1.1); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .module-cell.pass { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #4ade80; }
+    .module-cell.warn { background: rgba(234,179,8,0.15); border: 1px solid rgba(234,179,8,0.3); color: #eab308; }
+    .module-cell.fail { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; }
+    .module-cell.info { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #60a5fa; }
+    .module-tooltip {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 12px; font-size: 11px; white-space: nowrap; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s; z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .module-cell:hover .module-tooltip { opacity: 1; }
+
+    .binary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .binary-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px; transition: all 0.2s;
+    }
+    .binary-card:hover { border-color: var(--accent-blue); }
+    .binary-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .binary-name { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-primary); }
+    .binary-arch { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: rgba(59,130,246,0.15); color: #60a5fa; font-weight: 600; }
+    .binary-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .binary-meta-item { font-size: 11px; color: var(--text-secondary); }
+    .binary-meta-item strong { color: var(--text-primary); }
+    .binary-functions { font-size: 11px; color: var(--text-secondary); }
+    .binary-functions strong { color: var(--text-primary); }
+    .function-tag {
+      display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; margin: 2px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .fn-danger { background: rgba(239,68,68,0.15); color: #f87171; }
+    .fn-warn { background: rgba(234,179,8,0.15); color: #eab308; }
+    .fn-safe { background: rgba(34,197,94,0.15); color: #4ade80; }
+    .binary-bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 12px; overflow: hidden; }
+    .binary-bar-fill { height: 100%; border-radius: 2px; }
+
+    .emu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .emu-card {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px;
+    }
+    .emu-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .emu-status { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .emu-status.pass { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+    .emu-status.fail { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+    .emu-status.warn { background: var(--accent-yellow); box-shadow: 0 0 8px var(--accent-yellow); }
+    .emu-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+    .emu-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px; }
+    .emu-log {
+      background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px 12px;
+      font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #64748b;
+      max-height: 120px; overflow-y: auto;
+    }
+    .emu-log .log-ok { color: #4ade80; }
+    .emu-log .log-err { color: #f87171; }
+    .emu-log .log-warn { color: #eab308; }
+    .emu-log .log-info { color: #60a5fa; }
+
+    .report-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    .report-option {
+      background: var(--bg-tertiary); border: 2px solid var(--border); border-radius: 10px;
+      padding: 20px; cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .report-option:hover { border-color: var(--accent-blue); background: rgba(59,130,246,0.05); }
+    .report-option.selected { border-color: var(--accent-blue); background: rgba(59,130,246,0.1); }
+    .report-option-icon { font-size: 32px; margin-bottom: 10px; }
+    .report-option-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; }
+    .report-option-desc { font-size: 12px; color: var(--text-secondary); }
+    .report-btn {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      border: none; border-radius: 8px; padding: 14px 32px; color: white;
+      font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+      font-family: inherit;
+    }
+    .report-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59,130,246,0.3); }
+    .report-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .progress-bar { width: 100%; height: 6px; background: var(--border); border-radius: 3px; margin-top: 16px; overflow: hidden; display: none; }
+    .progress-bar.active { display: block; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); border-radius: 3px; width: 0%; transition: width 0.3s; }
+
+    .tabs { display: flex; gap: 4px; background: var(--bg-tertiary); padding: 4px; border-radius: 8px; width: fit-content; }
+    .tab { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; border: none; background: transparent; font-family: inherit; }
+    .tab.active { background: var(--accent-blue); color: white; }
+    .tab:hover:not(.active) { color: var(--text-primary); }
+
+    .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+    .filter-input {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 14px; color: var(--text-primary); font-size: 13px; width: 280px; font-family: inherit;
+    }
+    .filter-input:focus { outline: none; border-color: var(--accent-blue); }
+    .filter-btn {
+      background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 14px; color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all 0.2s; font-family: inherit;
+    }
+    .filter-btn:hover, .filter-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+    .delay-1 { animation-delay: 0.1s; opacity: 0; }
+    .delay-2 { animation-delay: 0.2s; opacity: 0; }
+    .delay-3 { animation-delay: 0.3s; opacity: 0; }
+    .delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-primary); }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    @media (max-width: 1200px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .chart-row { grid-template-columns: 1fr; }
+      .cred-grid { grid-template-columns: 1fr; }
+      .module-grid { grid-template-columns: repeat(4, 1fr); }
+      .binary-grid { grid-template-columns: repeat(2, 1fr); }
+      .emu-grid { grid-template-columns: 1fr; }
+      .report-options { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .kpi-grid { grid-template-columns: 1fr; }
+      .header { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .header-right { flex-direction: column; align-items: flex-start; gap: 8px; }
+      .risk-meter { flex-direction: column; align-items: center; }
+      .filter-input { width: 100%; }
+      .module-grid { grid-template-columns: repeat(4, 1fr); }
+      .binary-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <div class="logo-icon">&#128274;</div>
+        EMBA Security Dashboard
+      </div>
+      <span class="badge badge-kritis">KRITIS Compliant</span>
+      <span class="badge badge-cra">CRA Ready</span>
+    </div>
+    <div class="header-right">
+      <div class="scan-status">
+        <div class="pulse"></div>
+        <span>Analysis Complete &mdash; 14m 32s</span>
+      </div>
+      <div class="fw-info">
+        Firmware: <span>SMA_SunnyBoy_3.2.1_R.bin</span> &middot; Size: <span>28.4 MB</span> &middot; Arch: <span>ARM Cortex-A9</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="main">
+    <nav class="sidebar">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" onclick="switchPage('overview', this)">
+        <span class="icon">&#128202;</span> Executive Summary
+      </div>
+      <div class="nav-item" onclick="switchPage('sbom', this)">
+        <span class="icon">&#128230;</span> SBOM Analysis
+      </div>
+      <div class="nav-item" onclick="switchPage('cve', this)">
+        <span class="icon">&#128030;</span> CVE Timeline
+      </div>
+      <div class="nav-section">Findings</div>
+      <div class="nav-item" onclick="switchPage('credentials', this)">
+        <span class="icon">&#128273;</span> Hardcoded Creds
+      </div>
+      <div class="nav-item" onclick="switchPage('binaries', this)">
+        <span class="icon">&#9881;&#65039;</span> Binary Analysis
+      </div>
+      <div class="nav-item" onclick="switchPage('emulation', this)">
+        <span class="icon">&#129514;</span> Emulation Tests
+      </div>
+      <div class="nav-section">Compliance</div>
+      <div class="nav-item" onclick="switchPage('compliance', this)">
+        <span class="icon">&#128203;</span> NIS2 / CRA
+      </div>
+      <div class="nav-item" onclick="switchPage('report', this)">
+        <span class="icon">&#128196;</span> Generate Report
+      </div>
+    </nav>
+
+    <main class="content">
+
+      <!-- ==================== PAGE: OVERVIEW ==================== -->
+      <div id="page-overview" class="page-section active">
+
+        <div class="kpi-grid">
+          <div class="kpi-card critical animate-in delay-1">
+            <div class="kpi-label">Critical Findings</div>
+            <div class="kpi-value" style="color: var(--accent-red);">12</div>
+            <div class="kpi-sub"><span class="trend trend-up">&#8593; 3</span> vs. v3.1.9 baseline</div>
+          </div>
+          <div class="kpi-card high animate-in delay-2">
+            <div class="kpi-label">High Severity CVEs</div>
+            <div class="kpi-value" style="color: var(--accent-orange);">47</div>
+            <div class="kpi-sub"><span class="trend trend-up">&#8593; 8</span> newly disclosed</div>
+          </div>
+          <div class="kpi-card medium animate-in delay-3">
+            <div class="kpi-label">SBOM Components</div>
+            <div class="kpi-value" style="color: var(--accent-yellow);">1,247</div>
+            <div class="kpi-sub"><span class="trend trend-down">&#8595; 12%</span> attack surface reduced</div>
+          </div>
+          <div class="kpi-card info animate-in delay-4">
+            <div class="kpi-label">Security Score</div>
+            <div class="kpi-value" style="color: var(--accent-blue);">F</div>
+            <div class="kpi-sub">CVSS avg: <span style="color: var(--accent-orange); font-weight:600;">7.8</span> &middot; Exploitability: High</div>
+          </div>
+        </div>
+
+        <div class="chart-row">
+          <div class="section-card animate-in delay-2">
+            <div class="section-header">
+              <div class="section-title">&#127919; Risk Assessment</div>
+            </div>
+            <div class="section-body">
+              <div class="risk-meter">
+                <div class="risk-gauge">
+                  <svg viewBox="0 0 160 80">
+                    <path d="M 10 80 A 70 70 0 0 1 150 80" fill="none" stroke="#1e293b" stroke-width="12" stroke-linecap="round"/>
+                    <path d="M 10 80 A 70 70 0 0 1 80 10" fill="none" stroke="url(#grad1)" stroke-width="12" stroke-linecap="round" stroke-dasharray="110 220" stroke-dashoffset="0"/>
+                    <defs>
+                      <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#22c55e"/>
+                        <stop offset="50%" style="stop-color:#eab308"/>
+                        <stop offset="100%" style="stop-color:#ef4444"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <div class="risk-value">
+                    <div class="num" style="color: var(--accent-red);">9.2</div>
+                    <div class="label">Critical Risk</div>
+                  </div>
+                </div>
+                <div class="risk-details">
+                  <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;">Risk Distribution</div>
+                  <div class="risk-bar">
+                    <div class="risk-bar-segment" style="width: 35%; background: var(--accent-red);"></div>
+                    <div class="risk-bar-segment" style="width: 28%; background: var(--accent-orange);"></div>
+                    <div class="risk-bar-segment" style="width: 22%; background: var(--accent-yellow);"></div>
+                    <div class="risk-bar-segment" style="width: 15%; background: var(--accent-green);"></div>
+                  </div>
+                  <div class="risk-factors">
+                    <div class="risk-factor"><div class="risk-factor-dot" style="background: var(--accent-red);"></div>Critical: 12 findings</div>
+                    <div class="risk-factor"><div class="risk-factor-dot" style="background: var(--accent-orange);"></div>High: 47 CVEs</div>
+                    <div class="risk-factor"><div class="risk-factor-dot" style="background: var(--accent-yellow);"></div>Medium: 89 issues</div>
+                    <div class="risk-factor"><div class="risk-factor-dot" style="background: var(--accent-green);"></div>Low: 34 warnings</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card animate-in delay-3">
+            <div class="section-header">
+              <div class="section-title">&#129513; Module Execution Status</div>
+              <div class="tabs">
+                <button class="tab active" onclick="setModuleFilter(this, 'all')">All</button>
+                <button class="tab" onclick="setModuleFilter(this, 'fail')">Failed</button>
+                <button class="tab" onclick="setModuleFilter(this, 'warn')">Warnings</button>
+              </div>
+            </div>
+            <div class="section-body">
+              <div class="module-grid" id="moduleGrid">
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">P00 &mdash; System Info</span>P00</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">P05 &mdash; Firmware Check</span>P05</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">P10 &mdash; Kernel Analysis</span>P10</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">P15 &mdash; Bootloader</span>P15</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">P20 &mdash; File Extraction</span>P20</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">P25 &mdash; Version Check</span>P25</div>
+                <div class="module-cell fail" data-status="fail"><span class="module-tooltip">S10 &mdash; CVE Search (FAILED)</span>S10</div>
+                <div class="module-cell warn" data-status="warn"><span class="module-tooltip">S15 &mdash; Radare2 Decompile</span>S15</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S20 &mdash; Binary Analysis</span>S20</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S25 &mdash; PHP Checks</span>S25</div>
+                <div class="module-cell fail" data-status="fail"><span class="module-tooltip">S30 &mdash; Python Analysis (FAILED)</span>S30</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S35 &mdash; Lua Checks</span>S35</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S40 &mdash; Qemu Emulation</span>S40</div>
+                <div class="module-cell warn" data-status="warn"><span class="module-tooltip">S45 &mdash; Network Emulation</span>S45</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S50 &mdash; SSH Checks</span>S50</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S55 &mdash; HTTP Analysis</span>S55</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S60 &mdash; Certificate Checks</span>S60</div>
+                <div class="module-cell fail" data-status="fail"><span class="module-tooltip">S65 &mdash; Credential Hunt (FAILED)</span>S65</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S70 &mdash; SBOM Generation</span>S70</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S75 &mdash; License Audit</span>S75</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S80 &mdash; User Accounts</span>S80</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S85 &mdash; Passwd Checks</span>S85</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S90 &mdash; Mail Checks</span>S90</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S95 &mdash; Web Server</span>S95</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S100 &mdash; SNMP Checks</span>S100</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S105 &mdash; Telnet Analysis</span>S105</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S110 &mdash; IP Checks</span>S110</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S115 &mdash; Kernel Config</span>S115</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">S120 &mdash; CVE Aggregator</span>S120</div>
+                <div class="module-cell pass" data-status="pass"><span class="module-tooltip">F50 &mdash; Report Gen</span>F50</div>
+                <div class="module-cell info" data-status="info"><span class="module-tooltip">L10 &mdash; Live Emulation</span>L10</div>
+                <div class="module-cell info" data-status="info"><span class="module-tooltip">L15 &mdash; Network Tests</span>L15</div>
+                <div class="module-cell info" data-status="info"><span class="module-tooltip">L20 &mdash; Service Tests</span>L20</div>
+                <div class="module-cell info" data-status="info"><span class="module-tooltip">L25 &mdash; Web Tests</span>L25</div>
+                <div class="module-cell info" data-status="info"><span class="module-tooltip">L30 &mdash; API Tests</span>L30</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: SBOM ==================== -->
+      <div id="page-sbom" class="page-section">
+        <div class="section-card animate-in">
+          <div class="section-header">
+            <div class="section-title">&#128230; Software Bill of Materials (SBOM)</div>
+            <div class="filter-bar">
+              <input class="filter-input" type="text" placeholder="Filter components..." id="sbomFilter" oninput="filterSbom()">
+              <button class="filter-btn active" onclick="setSbomFilter(this, 'all')">All</button>
+              <button class="filter-btn" onclick="setSbomFilter(this, 'vulnerable')">Vulnerable</button>
+              <button class="filter-btn" onclick="setSbomFilter(this, 'eol')">EOL</button>
+              <button class="filter-btn" onclick="setSbomFilter(this, 'current')">Current</button>
+            </div>
+          </div>
+          <div class="section-body" style="padding: 0;">
+            <table class="sbom-table">
+              <thead>
+                <tr>
+                  <th>Component</th>
+                  <th>Version</th>
+                  <th>Type</th>
+                  <th>License</th>
+                  <th>CVEs</th>
+                  <th>Status</th>
+                  <th>Last Updated</th>
+                </tr>
+              </thead>
+              <tbody id="sbomTableBody">
+                <tr data-status="eol vulnerable">
+                  <td><strong>Linux Kernel</strong></td>
+                  <td>5.10.120</td>
+                  <td><span class="component-type type-kernel">&#128039; Kernel</span></td>
+                  <td>GPL-2.0</td>
+                  <td><span class="cve-badge cve-critical">12 CVEs</span></td>
+                  <td><span style="color: var(--accent-red); font-weight:600;">&#9888;&#65039; EOL</span></td>
+                  <td>2023-12-01</td>
+                </tr>
+                <tr data-status="outdated vulnerable">
+                  <td><strong>BusyBox</strong></td>
+                  <td>1.33.2</td>
+                  <td><span class="component-type type-binary">&#9881;&#65039; Binary</span></td>
+                  <td>GPL-2.0</td>
+                  <td><span class="cve-badge cve-high">8 CVEs</span></td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Outdated</span></td>
+                  <td>2022-03-15</td>
+                </tr>
+                <tr data-status="eol vulnerable">
+                  <td><strong>OpenSSL</strong></td>
+                  <td>1.1.1n</td>
+                  <td><span class="component-type type-library">&#128218; Library</span></td>
+                  <td>OpenSSL</td>
+                  <td><span class="cve-badge cve-critical">5 CVEs</span></td>
+                  <td><span style="color: var(--accent-red); font-weight:600;">&#9888;&#65039; EOL</span></td>
+                  <td>2022-03-15</td>
+                </tr>
+                <tr data-status="outdated vulnerable">
+                  <td><strong>libwebsockets</strong></td>
+                  <td>4.2.0</td>
+                  <td><span class="component-type type-library">&#128218; Library</span></td>
+                  <td>MIT</td>
+                  <td><span class="cve-badge cve-critical">3 CVEs</span></td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Outdated</span></td>
+                  <td>2021-08-20</td>
+                </tr>
+                <tr data-status="outdated vulnerable">
+                  <td><strong>Dropbear SSH</strong></td>
+                  <td>2020.81</td>
+                  <td><span class="component-type type-binary">&#9881;&#65039; Binary</span></td>
+                  <td>MIT</td>
+                  <td><span class="cve-badge cve-high">4 CVEs</span></td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Outdated</span></td>
+                  <td>2020-11-10</td>
+                </tr>
+                <tr data-status="current">
+                  <td><strong>lighttpd</strong></td>
+                  <td>1.4.59</td>
+                  <td><span class="component-type type-binary">&#9881;&#65039; Binary</span></td>
+                  <td>BSD-3</td>
+                  <td><span class="cve-badge cve-medium">2 CVEs</span></td>
+                  <td><span style="color: var(--accent-green); font-weight:600;">&#10003; Current</span></td>
+                  <td>2025-01-15</td>
+                </tr>
+                <tr data-status="current">
+                  <td><strong>uClibc-ng</strong></td>
+                  <td>1.0.38</td>
+                  <td><span class="component-type type-library">&#128218; Library</span></td>
+                  <td>LGPL-2.1</td>
+                  <td><span class="cve-badge cve-low">1 CVE</span></td>
+                  <td><span style="color: var(--accent-green); font-weight:600;">&#10003; Current</span></td>
+                  <td>2025-02-28</td>
+                </tr>
+                <tr data-status="outdated vulnerable">
+                  <td><strong>zlib</strong></td>
+                  <td>1.2.11</td>
+                  <td><span class="component-type type-library">&#128218; Library</span></td>
+                  <td>Zlib</td>
+                  <td><span class="cve-badge cve-high">6 CVEs</span></td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Outdated</span></td>
+                  <td>2017-01-15</td>
+                </tr>
+                <tr data-status="eol vulnerable">
+                  <td><strong>glibc</strong></td>
+                  <td>2.31</td>
+                  <td><span class="component-type type-library">&#128218; Library</span></td>
+                  <td>LGPL-2.1</td>
+                  <td><span class="cve-badge cve-critical">9 CVEs</span></td>
+                  <td><span style="color: var(--accent-red); font-weight:600;">&#9888;&#65039; EOL</span></td>
+                  <td>2020-02-01</td>
+                </tr>
+                <tr data-status="current">
+                  <td><strong>iptables</strong></td>
+                  <td>1.8.7</td>
+                  <td><span class="component-type type-binary">&#9881;&#65039; Binary</span></td>
+                  <td>GPL-2.0</td>
+                  <td><span class="cve-badge cve-low">1 CVE</span></td>
+                  <td><span style="color: var(--accent-green); font-weight:600;">&#10003; Current</span></td>
+                  <td>2024-11-20</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section-card animate-in delay-1">
+          <div class="section-header">
+            <div class="section-title">&#128200; SBOM Statistics</div>
+          </div>
+          <div class="section-body">
+            <div class="kpi-grid" style="margin-bottom: 0;">
+              <div style="text-align: center; padding: 16px;">
+                <div style="font-size: 28px; font-weight: 800; color: var(--accent-blue);">1,247</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Total Components</div>
+              </div>
+              <div style="text-align: center; padding: 16px;">
+                <div style="font-size: 28px; font-weight: 800; color: var(--accent-red);">342</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Vulnerable Components</div>
+              </div>
+              <div style="text-align: center; padding: 16px;">
+                <div style="font-size: 28px; font-weight: 800; color: var(--accent-orange);">89</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">EOL / Outdated</div>
+              </div>
+              <div style="text-align: center; padding: 16px;">
+                <div style="font-size: 28px; font-weight: 800; color: var(--accent-green);">816</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Up-to-Date</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: CVE TIMELINE ==================== -->
+      <div id="page-cve" class="page-section">
+        <div class="section-card animate-in">
+          <div class="section-header">
+            <div class="section-title">&#128030; CVE Disclosure Timeline</div>
+            <div class="tabs">
+              <button class="tab active" onclick="setCveYear(this, 'all')">All Time</button>
+              <button class="tab" onclick="setCveYear(this, '2026')">2026</button>
+              <button class="tab" onclick="setCveYear(this, '2025')">2025</button>
+              <button class="tab" onclick="setCveYear(this, '2024')">2024</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="timeline-container">
+              <div class="timeline-line"></div>
+              <div class="timeline-item" data-year="2026">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2026-2847</span>
+                    <span class="cve-score score-critical">CVSS 9.8</span>
+                  </div>
+                  <div class="cve-desc">Buffer overflow in SMA WebConnect CGI handler allows remote code execution without authentication. Affects all firmware versions &le; 3.2.1.</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2026-06-12</span>
+                    <span>&#128295; Component: libwebsockets 4.2.0</span>
+                    <span>&#9889; Exploit Available: Yes (Metasploit)</span>
+                    <span>&#127465;&#127466; BSI-WID: BSI-2026-0612-1</span>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-item" data-year="2026">
+                <div class="timeline-dot critical"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2026-2103</span>
+                    <span class="cve-score score-critical">CVSS 9.1</span>
+                  </div>
+                  <div class="cve-desc">Hardcoded RSA private key in /etc/ssl/certs/sma_default.pem enables man-in-the-middle attacks on Modbus TCP communication.</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2026-04-28</span>
+                    <span>&#128295; Component: OpenSSL 1.1.1n</span>
+                    <span>&#9889; Exploit Available: PoC on GitHub</span>
+                    <span>&#127465;&#127466; BSI-WID: BSI-2026-0428-3</span>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-item" data-year="2025">
+                <div class="timeline-dot high"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2025-9876</span>
+                    <span class="cve-score score-high">CVSS 8.4</span>
+                  </div>
+                  <div class="cve-desc">Use-after-free in Linux kernel netfilter subsystem (v5.10.120) allows local privilege escalation via crafted iptables rules.</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2025-11-03</span>
+                    <span>&#128295; Component: Linux Kernel 5.10.120</span>
+                    <span>&#9889; Exploit Available: No</span>
+                    <span>&#127465;&#127466; BSI-WID: BSI-2025-1103-2</span>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-item" data-year="2025">
+                <div class="timeline-dot high"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2025-7421</span>
+                    <span class="cve-score score-high">CVSS 7.8</span>
+                  </div>
+                  <div class="cve-desc">Path traversal in BusyBox tar extraction allows arbitrary file overwrite during firmware update process.</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2025-08-15</span>
+                    <span>&#128295; Component: BusyBox 1.33.2</span>
+                    <span>&#9889; Exploit Available: Yes</span>
+                    <span>&#127465;&#127466; BSI-WID: BSI-2025-0815-1</span>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-item" data-year="2024">
+                <div class="timeline-dot medium"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2024-5123</span>
+                    <span class="cve-score" style="background:rgba(234,179,8,0.2);color:var(--accent-yellow);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px;">CVSS 6.5</span>
+                  </div>
+                  <div class="cve-desc">Information disclosure in udhcpc client leaks internal network topology via DHCP option 61 (client identifier).</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2024-09-22</span>
+                    <span>&#128295; Component: udhcpc (busybox)</span>
+                    <span>&#9889; Exploit Available: No</span>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-item" data-year="2024">
+                <div class="timeline-dot high"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2024-3848</span>
+                    <span class="cve-score score-high">CVSS 7.5</span>
+                  </div>
+                  <div class="cve-desc">Integer overflow in glibc malloc allows heap corruption via specially crafted allocation requests in embedded web server.</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2024-05-14</span>
+                    <span>&#128295; Component: glibc 2.31</span>
+                    <span>&#9889; Exploit Available: No</span>
+                    <span>&#127465;&#127466; BSI-WID: BSI-2024-0514-2</span>
+                  </div>
+                </div>
+              </div>
+              <div class="timeline-item" data-year="2024">
+                <div class="timeline-dot medium"></div>
+                <div class="timeline-content">
+                  <div class="timeline-header">
+                    <span class="cve-id">CVE-2024-1092</span>
+                    <span class="cve-score" style="background:rgba(234,179,8,0.2);color:var(--accent-yellow);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;padding:2px 8px;border-radius:4px;">CVSS 5.9</span>
+                  </div>
+                  <div class="cve-desc">NULL pointer dereference in Dropbear SSH server during key exchange when handling malformed ECDSA signatures.</div>
+                  <div class="cve-meta">
+                    <span>&#128197; Published: 2024-02-08</span>
+                    <span>&#128295; Component: Dropbear 2020.81</span>
+                    <span>&#9889; Exploit Available: No</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: CREDENTIALS ==================== -->
+      <div id="page-credentials" class="page-section">
+        <div class="section-card animate-in">
+          <div class="section-header">
+            <div class="section-title">&#128273; Hardcoded Credential Findings</div>
+            <div class="tabs">
+              <button class="tab active" onclick="setCredFilter(this, 'all')">All</button>
+              <button class="tab" onclick="setCredFilter(this, 'password')">Passwords</button>
+              <button class="tab" onclick="setCredFilter(this, 'key')">Keys</button>
+              <button class="tab" onclick="setCredFilter(this, 'token')">Tokens</button>
+              <button class="tab" onclick="setCredFilter(this, 'cert')">Certificates</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="cred-grid" id="credGrid">
+              <div class="cred-card" data-type="password">
+                <div class="cred-icon password">&#128272;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/etc/passwd</div>
+                  <div class="cred-type">Root Password Hash (MD5)</div>
+                  <div class="cred-value">$1$xyz$abc123def456...</div>
+                </div>
+                <span class="cred-severity sev-critical">CRITICAL</span>
+              </div>
+              <div class="cred-card" data-type="key">
+                <div class="cred-icon key">&#128273;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/etc/ssl/certs/sma_default.pem</div>
+                  <div class="cred-type">RSA Private Key (2048-bit)</div>
+                  <div class="cred-value">-----BEGIN RSA PRIVATE KEY-----<br>MIIBOgIBAAJBALRiMLAH...</div>
+                </div>
+                <span class="cred-severity sev-critical">CRITICAL</span>
+              </div>
+              <div class="cred-card" data-type="token">
+                <div class="cred-icon token">&#127915;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/usr/bin/webconnect</div>
+                  <div class="cred-type">Hardcoded API Token</div>
+                  <div class="cred-value">Bearer sk_live_51Hx9KL...Zm9uZGF0aW9u</div>
+                </div>
+                <span class="cred-severity sev-high">HIGH</span>
+              </div>
+              <div class="cred-card" data-type="cert">
+                <div class="cred-icon cert">&#128220;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/etc/ssl/certs/ca-bundle.crt</div>
+                  <div class="cred-type">Self-Signed CA Certificate</div>
+                  <div class="cred-value">CN=SMA-Internal-CA, O=SMA Solar Technology AG</div>
+                </div>
+                <span class="cred-severity sev-high">HIGH</span>
+              </div>
+              <div class="cred-card" data-type="password">
+                <div class="cred-icon password">&#128272;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/etc/config/system</div>
+                  <div class="cred-type">Default WiFi PSK</div>
+                  <div class="cred-value">SMA_Default_2023!</div>
+                </div>
+                <span class="cred-severity sev-high">HIGH</span>
+              </div>
+              <div class="cred-card" data-type="key">
+                <div class="cred-icon key">&#128273;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/usr/lib/modbus/modbus.key</div>
+                  <div class="cred-type">Modbus TLS Pre-Shared Key</div>
+                  <div class="cred-value">0xdeadbeefcafebabe...</div>
+                </div>
+                <span class="cred-severity sev-high">HIGH</span>
+              </div>
+              <div class="cred-card" data-type="password">
+                <div class="cred-icon password">&#128272;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/etc/shadow</div>
+                  <div class="cred-type">Admin Account Hash (SHA-256)</div>
+                  <div class="cred-value">$5$rounds=5000$salt$hashvalue...</div>
+                </div>
+                <span class="cred-severity sev-high">HIGH</span>
+              </div>
+              <div class="cred-card" data-type="token">
+                <div class="cred-icon token">&#127915;</div>
+                <div class="cred-details">
+                  <div class="cred-file">/usr/bin/cloud_sync</div>
+                  <div class="cred-type">AWS Access Key ID</div>
+                  <div class="cred-value">AKIAIOSFODNN7EXAMPLE</div>
+                </div>
+                <span class="cred-severity sev-high">HIGH</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: BINARY ANALYSIS ==================== -->
+      <div id="page-binaries" class="page-section">
+        <div class="section-card animate-in">
+          <div class="section-header">
+            <div class="section-title">&#9881;&#65039; Binary Analysis Results</div>
+            <div class="tabs">
+              <button class="tab active">All Binaries</button>
+              <button class="tab">Stripped</button>
+              <button class="tab">NX Disabled</button>
+              <button class="tab">No PIE</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="binary-grid">
+              <div class="binary-card">
+                <div class="binary-header">
+                  <span class="binary-name">/usr/sbin/webconnect</span>
+                  <span class="binary-arch">ARM ELF</span>
+                </div>
+                <div class="binary-meta">
+                  <div class="binary-meta-item">Size: <strong>2.4 MB</strong></div>
+                  <div class="binary-meta-item">Compiler: <strong>gcc 10.3</strong></div>
+                  <div class="binary-meta-item">Stripped: <strong style="color:var(--accent-red);">No</strong></div>
+                  <div class="binary-meta-item">PIE: <strong style="color:var(--accent-green);">Yes</strong></div>
+                </div>
+                <div class="binary-functions">
+                  <strong>Dangerous Functions:</strong><br>
+                  <span class="function-tag fn-danger">strcpy</span>
+                  <span class="function-tag fn-danger">sprintf</span>
+                  <span class="function-tag fn-danger">gets</span>
+                  <span class="function-tag fn-warn">memcpy</span>
+                  <span class="function-tag fn-warn">system</span>
+                  <span class="function-tag fn-safe">strncpy</span>
+                </div>
+                <div class="binary-bar"><div class="binary-bar-fill" style="width: 78%; background: var(--accent-red);"></div></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Risk Score: 7.8 / 10</div>
+              </div>
+
+              <div class="binary-card">
+                <div class="binary-header">
+                  <span class="binary-name">/usr/bin/modbusd</span>
+                  <span class="binary-arch">ARM ELF</span>
+                </div>
+                <div class="binary-meta">
+                  <div class="binary-meta-item">Size: <strong>1.1 MB</strong></div>
+                  <div class="binary-meta-item">Compiler: <strong>gcc 10.3</strong></div>
+                  <div class="binary-meta-item">Stripped: <strong style="color:var(--accent-green);">Yes</strong></div>
+                  <div class="binary-meta-item">PIE: <strong style="color:var(--accent-red);">No</strong></div>
+                </div>
+                <div class="binary-functions">
+                  <strong>Dangerous Functions:</strong><br>
+                  <span class="function-tag fn-danger">strcpy</span>
+                  <span class="function-tag fn-danger">strcat</span>
+                  <span class="function-tag fn-warn">memcpy</span>
+                  <span class="function-tag fn-safe">strlcpy</span>
+                </div>
+                <div class="binary-bar"><div class="binary-bar-fill" style="width: 65%; background: var(--accent-orange);"></div></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Risk Score: 6.5 / 10</div>
+              </div>
+
+              <div class="binary-card">
+                <div class="binary-header">
+                  <span class="binary-name">/usr/sbin/lighttpd</span>
+                  <span class="binary-arch">ARM ELF</span>
+                </div>
+                <div class="binary-meta">
+                  <div class="binary-meta-item">Size: <strong>580 KB</strong></div>
+                  <div class="binary-meta-item">Compiler: <strong>gcc 10.3</strong></div>
+                  <div class="binary-meta-item">Stripped: <strong style="color:var(--accent-green);">Yes</strong></div>
+                  <div class="binary-meta-item">PIE: <strong style="color:var(--accent-green);">Yes</strong></div>
+                </div>
+                <div class="binary-functions">
+                  <strong>Dangerous Functions:</strong><br>
+                  <span class="function-tag fn-warn">memcpy</span>
+                  <span class="function-tag fn-safe">strncpy</span>
+                  <span class="function-tag fn-safe">strlcpy</span>
+                </div>
+                <div class="binary-bar"><div class="binary-bar-fill" style="width: 32%; background: var(--accent-yellow);"></div></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Risk Score: 3.2 / 10</div>
+              </div>
+
+              <div class="binary-card">
+                <div class="binary-header">
+                  <span class="binary-name">/usr/bin/dropbear</span>
+                  <span class="binary-arch">ARM ELF</span>
+                </div>
+                <div class="binary-meta">
+                  <div class="binary-meta-item">Size: <strong>320 KB</strong></div>
+                  <div class="binary-meta-item">Compiler: <strong>gcc 10.3</strong></div>
+                  <div class="binary-meta-item">Stripped: <strong style="color:var(--accent-green);">Yes</strong></div>
+                  <div class="binary-meta-item">PIE: <strong style="color:var(--accent-green);">Yes</strong></div>
+                </div>
+                <div class="binary-functions">
+                  <strong>Dangerous Functions:</strong><br>
+                  <span class="function-tag fn-warn">memcpy</span>
+                  <span class="function-tag fn-safe">strncpy</span>
+                </div>
+                <div class="binary-bar"><div class="binary-bar-fill" style="width: 25%; background: var(--accent-green);"></div></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Risk Score: 2.5 / 10</div>
+              </div>
+
+              <div class="binary-card">
+                <div class="binary-header">
+                  <span class="binary-name">/usr/sbin/fwupdate</span>
+                  <span class="binary-arch">ARM ELF</span>
+                </div>
+                <div class="binary-meta">
+                  <div class="binary-meta-item">Size: <strong>890 KB</strong></div>
+                  <div class="binary-meta-item">Compiler: <strong>gcc 10.3</strong></div>
+                  <div class="binary-meta-item">Stripped: <strong style="color:var(--accent-red);">No</strong></div>
+                  <div class="binary-meta-item">PIE: <strong style="color:var(--accent-red);">No</strong></div>
+                </div>
+                <div class="binary-functions">
+                  <strong>Dangerous Functions:</strong><br>
+                  <span class="function-tag fn-danger">strcpy</span>
+                  <span class="function-tag fn-danger">sprintf</span>
+                  <span class="function-tag fn-danger">system</span>
+                  <span class="function-tag fn-danger">popen</span>
+                  <span class="function-tag fn-warn">memcpy</span>
+                </div>
+                <div class="binary-bar"><div class="binary-bar-fill" style="width: 92%; background: var(--accent-red);"></div></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Risk Score: 9.2 / 10</div>
+              </div>
+
+              <div class="binary-card">
+                <div class="binary-header">
+                  <span class="binary-name">/usr/bin/busybox</span>
+                  <span class="binary-arch">ARM ELF</span>
+                </div>
+                <div class="binary-meta">
+                  <div class="binary-meta-item">Size: <strong>1.8 MB</strong></div>
+                  <div class="binary-meta-item">Compiler: <strong>gcc 10.3</strong></div>
+                  <div class="binary-meta-item">Stripped: <strong style="color:var(--accent-green);">Yes</strong></div>
+                  <div class="binary-meta-item">PIE: <strong style="color:var(--accent-green);">Yes</strong></div>
+                </div>
+                <div class="binary-functions">
+                  <strong>Dangerous Functions:</strong><br>
+                  <span class="function-tag fn-danger">strcpy</span>
+                  <span class="function-tag fn-warn">memcpy</span>
+                  <span class="function-tag fn-safe">strncpy</span>
+                </div>
+                <div class="binary-bar"><div class="binary-bar-fill" style="width: 45%; background: var(--accent-orange);"></div></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">Risk Score: 4.5 / 10</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: EMULATION TESTS ==================== -->
+      <div id="page-emulation" class="page-section">
+        <div class="section-card animate-in">
+          <div class="section-header">
+            <div class="section-title">&#129514; QEMU Emulation Test Results</div>
+            <div class="tabs">
+              <button class="tab active">All Tests</button>
+              <button class="tab">Passed</button>
+              <button class="tab">Failed</button>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="emu-grid">
+              <div class="emu-card">
+                <div class="emu-header">
+                  <div class="emu-status pass"></div>
+                  <span class="emu-title">System Boot Emulation</span>
+                </div>
+                <div class="emu-desc">Firmware successfully booted in QEMU ARM virt machine. Kernel 5.10.120 loaded with initrd. System reached multi-user target.</div>
+                <div class="emu-log">
+                  <span class="log-info">[INFO]</span> Loading kernel image...<br>
+                  <span class="log-ok">[OK]</span> Kernel decompressed at 0x80008000<br>
+                  <span class="log-ok">[OK]</span> Initrd mounted at /initrd<br>
+                  <span class="log-ok">[OK]</span> systemd reached target multi-user<br>
+                  <span class="log-info">[INFO]</span> Boot time: 4.2s
+                </div>
+              </div>
+
+              <div class="emu-card">
+                <div class="emu-header">
+                  <div class="emu-status fail"></div>
+                  <span class="emu-title">Network Stack Fuzzing</span>
+                </div>
+                <div class="emu-desc">Fuzzing of TCP/IP stack with boofuzz detected crash in libwebsockets handler. Remote code execution vector confirmed.</div>
+                <div class="emu-log">
+                  <span class="log-info">[INFO]</span> Starting boofuzz session...<br>
+                  <span class="log-warn">[WARN]</span> Sending malformed HTTP request...<br>
+                  <span class="log-err">[CRASH]</span> SIGSEGV at 0xb6f8a000<br>
+                  <span class="log-err">[CRASH]</span> PC: 0x00012345 in cgi_handler<br>
+                  <span class="log-err">[FAIL]</span> Exploitable crash confirmed
+                </div>
+              </div>
+
+              <div class="emu-card">
+                <div class="emu-header">
+                  <div class="emu-status pass"></div>
+                  <span class="emu-title">SSH Brute Force Resistance</span>
+                </div>
+                <div class="emu-desc">Dropbear SSH server correctly rate-limited authentication attempts. No bypass found for max retry mechanism.</div>
+                <div class="emu-log">
+                  <span class="log-info">[INFO]</span> Starting hydra brute force...<br>
+                  <span class="log-warn">[WARN]</span> Attempt 1/3: root/admin123<br>
+                  <span class="log-warn">[WARN]</span> Attempt 2/3: root/password<br>
+                  <span class="log-warn">[WARN]</span> Attempt 3/3: root/123456<br>
+                  <span class="log-ok">[OK]</span> Connection blocked after 3 attempts
+                </div>
+              </div>
+
+              <div class="emu-card">
+                <div class="emu-header">
+                  <div class="emu-status warn"></div>
+                  <span class="emu-title">Web Server Path Traversal</span>
+                </div>
+                <div class="emu-desc">lighttpd partially mitigated path traversal but allowed access to /proc/self/environ via URL-encoded null bytes.</div>
+                <div class="emu-log">
+                  <span class="log-info">[INFO]</span> Testing path traversal vectors...<br>
+                  <span class="log-ok">[OK]</span> /../../../etc/passwd blocked<br>
+                  <span class="log-ok">[OK]</span> /..%2f..%2fetc%2fpasswd blocked<br>
+                  <span class="log-warn">[WARN]</span> /proc/self/environ accessible<br>
+                  <span class="log-warn">[WARN]</span> Information disclosure vector
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: COMPLIANCE ==================== -->
+      <div id="page-compliance" class="page-section">
+        <div class="section-card animate-in" style="background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(59,130,246,0.1)); border-color: rgba(168,85,247,0.3);">
+          <div class="section-body">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 16px; font-weight: 700; color: var(--accent-purple); margin-bottom: 6px;">&#127757; Cyber Resilience Act (CRA) Compliance Status</div>
+                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+                  This firmware is classified as <strong style="color: var(--accent-red);">Class I (Important)</strong> under the EU Cyber Resilience Act. 
+                  <strong>182 vulnerabilities</strong> exceed the CRA "no known exploitable vulnerabilities" requirement. 
+                  ENISA reporting deadline: <strong style="color: var(--accent-orange);">September 11, 2026</strong>.
+                </div>
+              </div>
+              <div style="text-align: center; flex-shrink: 0;">
+                <div style="font-size: 36px; font-weight: 800; color: var(--accent-red);">&#10060;</div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">NOT COMPLIANT</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 140px; background: var(--bg-tertiary); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--border);">
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">SBOM Coverage</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--accent-orange);">87%</div>
+                <div style="font-size: 11px; color: #64748b;">163 of 187 components identified</div>
+              </div>
+              <div style="flex: 1; min-width: 140px; background: var(--bg-tertiary); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--border);">
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">VEX Status</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--accent-red);">0%</div>
+                <div style="font-size: 11px; color: #64748b;">No VEX documents generated</div>
+              </div>
+              <div style="flex: 1; min-width: 140px; background: var(--bg-tertiary); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--border);">
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Patch Cadence</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--accent-red);">412d</div>
+                <div style="font-size: 11px; color: #64748b;">Last security update: 2025-05-28</div>
+              </div>
+              <div style="flex: 1; min-width: 140px; background: var(--bg-tertiary); border-radius: 8px; padding: 12px 16px; border: 1px solid var(--border);">
+                <div style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">NIS2 Impact</div>
+                <div style="font-size: 20px; font-weight: 700; color: var(--accent-orange);">HIGH</div>
+                <div style="font-size: 11px; color: #64748b;">Energy sector KRITIS operator</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card animate-in delay-1">
+          <div class="section-header">
+            <div class="section-title">&#128203; NIS2 Directive Compliance Matrix</div>
+          </div>
+          <div class="section-body" style="padding: 0;">
+            <table class="sbom-table">
+              <thead>
+                <tr>
+                  <th>Requirement</th>
+                  <th>Article</th>
+                  <th>Status</th>
+                  <th>Finding Count</th>
+                  <th>Remediation</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Risk Analysis &amp; Management</strong></td>
+                  <td>Art. 21(1)</td>
+                  <td><span style="color: var(--accent-red); font-weight:600;">&#10060; Non-Compliant</span></td>
+                  <td><span class="cve-badge cve-critical">12 Critical</span></td>
+                  <td>Implement SBOM tracking &amp; CVE monitoring</td>
+                </tr>
+                <tr>
+                  <td><strong>Incident Handling</strong></td>
+                  <td>Art. 21(2)</td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Partial</span></td>
+                  <td><span class="cve-badge cve-high">3 Gaps</span></td>
+                  <td>Add automated incident response playbook</td>
+                </tr>
+                <tr>
+                  <td><strong>Business Continuity</strong></td>
+                  <td>Art. 21(3)</td>
+                  <td><span style="color: var(--accent-green); font-weight:600;">&#10003; Compliant</span></td>
+                  <td><span class="cve-badge cve-low">0 Gaps</span></td>
+                  <td>Backup &amp; recovery mechanisms verified</td>
+                </tr>
+                <tr>
+                  <td><strong>Supply Chain Security</strong></td>
+                  <td>Art. 21(4)</td>
+                  <td><span style="color: var(--accent-red); font-weight:600;">&#10060; Non-Compliant</span></td>
+                  <td><span class="cve-badge cve-critical">89 EOL</span></td>
+                  <td>Update 89 outdated components</td>
+                </tr>
+                <tr>
+                  <td><strong>Security by Design</strong></td>
+                  <td>Art. 21(5)</td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Partial</span></td>
+                  <td><span class="cve-badge cve-high">6 Hardcoded</span></td>
+                  <td>Remove hardcoded credentials &amp; keys</td>
+                </tr>
+                <tr>
+                  <td><strong>Vulnerability Disclosure</strong></td>
+                  <td>Art. 21(6)</td>
+                  <td><span style="color: var(--accent-red); font-weight:600;">&#10060; Non-Compliant</span></td>
+                  <td><span class="cve-badge cve-critical">No VDP</span></td>
+                  <td>Establish vulnerability disclosure program</td>
+                </tr>
+                <tr>
+                  <td><strong>Cryptography &amp; Encryption</strong></td>
+                  <td>Art. 21(7)</td>
+                  <td><span style="color: var(--accent-orange); font-weight:600;">&#9888;&#65039; Partial</span></td>
+                  <td><span class="cve-badge cve-high">2 Weak</span></td>
+                  <td>Replace MD5 hashes, upgrade TLS to 1.3</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== PAGE: REPORT GENERATOR ==================== -->
+      <div id="page-report" class="page-section">
+        <div class="section-card animate-in">
+          <div class="section-header">
+            <div class="section-title">&#128196; Generate Security Report</div>
+          </div>
+          <div class="section-body">
+            <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+              Select report formats and compliance frameworks to include in the generated document. 
+              Reports are generated server-side and include all findings from the current EMBA scan.
+            </div>
+
+            <div class="report-options">
+              <div class="report-option selected" onclick="toggleReport(this)">
+                <div class="report-option-icon">&#128196;</div>
+                <div class="report-option-title">HTML Report</div>
+                <div class="report-option-desc">Interactive web-based report with full navigation and filtering capabilities.</div>
+              </div>
+              <div class="report-option selected" onclick="toggleReport(this)">
+                <div class="report-option-icon">&#128459;</div>
+                <div class="report-option-title">PDF Report</div>
+                <div class="report-option-desc">Print-ready PDF with executive summary, technical findings, and appendices.</div>
+              </div>
+              <div class="report-option" onclick="toggleReport(this)">
+                <div class="report-option-icon">&#128230;</div>
+                <div class="report-option-title">CycloneDX SBOM</div>
+                <div class="report-option-desc">Machine-readable SBOM in CycloneDX JSON format for supply chain integration.</div>
+              </div>
+              <div class="report-option" onclick="toggleReport(this)">
+                <div class="report-option-icon">&#128203;</div>
+                <div class="report-option-title">VEX Document</div>
+                <div class="report-option-desc">Vulnerability Exploitability eXchange document for CRA/NIS2 compliance.</div>
+              </div>
+              <div class="report-option selected" onclick="toggleReport(this)">
+                <div class="report-option-icon">&#128220;</div>
+                <div class="report-option-title">SARIF Output</div>
+                <div class="report-option-desc">Static Analysis Results Interchange Format for CI/CD pipeline integration.</div>
+              </div>
+              <div class="report-option" onclick="toggleReport(this)">
+                <div class="report-option-icon">&#128295;</div>
+                <div class="report-option-title">Raw JSON</div>
+                <div class="report-option-desc">Complete raw scan data in JSON format for custom tooling and automation.</div>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <button class="report-btn" onclick="generateReport()">&#128190; Generate Selected Reports</button>
+              <span id="reportStatus" style="font-size: 13px; color: var(--text-secondary);">3 formats selected</span>
+            </div>
+
+            <div class="progress-bar" id="progressBar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="reportResult" style="margin-top: 16px; font-size: 13px; display: none;"></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // ===== PAGE NAVIGATION =====
+    function switchPage(pageId, navEl) {
+      // Update sidebar active state
+      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+      navEl.classList.add('active');
+
+      // Hide all pages
+      document.querySelectorAll('.page-section').forEach(page => {
+        page.classList.remove('active');
+      });
+
+      // Show target page
+      const target = document.getElementById('page-' + pageId);
+      if (target) {
+        target.classList.add('active');
+        // Re-trigger animations
+        target.querySelectorAll('.animate-in').forEach(el => {
+          el.style.animation = 'none';
+          el.offsetHeight; // trigger reflow
+          el.style.animation = '';
+        });
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ===== SBOM FILTER =====
+    let currentSbomFilter = 'all';
+    function filterSbom() {
+      applySbomFilter();
+    }
+    function setSbomFilter(btn, filter) {
+      currentSbomFilter = filter;
+      btn.parentElement.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applySbomFilter();
+    }
+    function applySbomFilter() {
+      const term = document.getElementById('sbomFilter').value.toLowerCase();
+      document.querySelectorAll('#sbomTableBody tr').forEach(row => {
+        const status = row.getAttribute('data-status') || '';
+        const textMatch = row.textContent.toLowerCase().includes(term);
+        let statusMatch = true;
+        if (currentSbomFilter === 'vulnerable') statusMatch = status.includes('vulnerable');
+        if (currentSbomFilter === 'eol') statusMatch = status.includes('eol') || status.includes('outdated');
+        if (currentSbomFilter === 'current') statusMatch = status === 'current';
+        row.style.display = (textMatch && statusMatch) ? '' : 'none';
+      });
+    }
+
+    // ===== CREDENTIAL FILTER =====
+    let currentCredFilter = 'all';
+    function setCredFilter(btn, filter) {
+      currentCredFilter = filter;
+      btn.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#credGrid .cred-card').forEach(card => {
+        const type = card.getAttribute('data-type');
+        card.style.display = (filter === 'all' || type === filter) ? 'flex' : 'none';
+      });
+    }
+
+    // ===== MODULE FILTER =====
+    function setModuleFilter(btn, filter) {
+      btn.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#moduleGrid .module-cell').forEach(cell => {
+        const status = cell.getAttribute('data-status');
+        cell.style.display = (filter === 'all' || status === filter) ? 'flex' : 'none';
+      });
+    }
+
+    // ===== CVE YEAR FILTER =====
+    function setCveYear(btn, year) {
+      btn.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#page-cve .timeline-item').forEach(item => {
+        const itemYear = item.getAttribute('data-year');
+        item.style.display = (year === 'all' || itemYear === year) ? 'block' : 'none';
+      });
+    }
+
+    // ===== REPORT GENERATOR =====
+    function toggleReport(el) {
+      el.classList.toggle('selected');
+      const count = document.querySelectorAll('.report-option.selected').length;
+      document.getElementById('reportStatus').textContent = count + ' format' + (count !== 1 ? 's' : '') + ' selected';
+    }
+
+    function generateReport() {
+      const btn = document.querySelector('.report-btn');
+      const bar = document.getElementById('progressBar');
+      const fill = document.getElementById('progressFill');
+      const result = document.getElementById('reportResult');
+
+      btn.disabled = true;
+      bar.classList.add('active');
+      result.style.display = 'none';
+
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 15 + 5;
+        if (progress > 100) progress = 100;
+        fill.style.width = progress + '%';
+
+        if (progress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            bar.classList.remove('active');
+            fill.style.width = '0%';
+            btn.disabled = false;
+            result.style.display = 'block';
+            result.innerHTML = '<span style="color: var(--accent-green);">&#10003;</span> <strong>Reports generated successfully!</strong><br>' +
+              '<span style="color: var(--text-secondary);">Download: </span>' +
+              '<a href="#" style="color: var(--accent-blue);">emba_report_20260714.html</a> &middot; ' +
+              '<a href="#" style="color: var(--accent-blue);">emba_report_20260714.pdf</a> &middot; ' +
+              '<a href="#" style="color: var(--accent-blue);">emba_sbom_20260714.json</a>';
+          }, 500);
+        }
+      }, 200);
+    }
+  </script>
+</body>
+</html>
