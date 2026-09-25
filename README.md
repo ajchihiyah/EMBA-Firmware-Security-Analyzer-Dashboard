@@ -1,3 +1,5 @@
+<img width="1919" height="935" alt="image" src="https://github.com/user-attachments/assets/e963796c-9890-4b9e-afd1-d6f3d27b604d" />
+
 # EMBA Firmware Security Analyzer Dashboard
 
 > A modern, interactive web dashboard that wraps EMBA's CLI output into a visually rich single-page application for firmware security analysis. Built for penetration testers, product security teams, and KRITIS compliance auditors in Germany.
