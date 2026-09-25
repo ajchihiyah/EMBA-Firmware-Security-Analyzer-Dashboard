@@ -101,8 +101,7 @@
 
 ## Architecture
 
-```
-emba_dashboard.html          # Single self-contained file (~82 KB)
+emba_dashboard.html          Single self-contained file (~82 KB)
 ├── <head>
 │   ├── Google Fonts (Inter, JetBrains Mono)
 │   └── CSS (~1,200 lines, custom properties, responsive breakpoints)
@@ -112,7 +111,16 @@ emba_dashboard.html          # Single self-contained file (~82 KB)
 │   ├── Content Area (8 page sections, CSS-display toggled)
 │   └── <script> (~200 lines, vanilla JS, no frameworks)
 └── No external dependencies beyond fonts
-```
+
+**Current implementation:** Zero-dependency, single-file vanilla JS (HTML/CSS/JS) —
+deployable in restricted SOC environments with no build step or external dependencies.
+
+**Production implementation path:** Where multi-user, real-time, or enterprise integration
+requirements demand it, the production build is implemented in **React with D3.js/Chart.js**
+for componentized state management, API-driven data layers, and role-based access —
+migrating the current state-driven rendering pattern into a component architecture.
+
+---
 
 ### Page Routing
 ```javascript
